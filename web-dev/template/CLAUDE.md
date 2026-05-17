@@ -106,7 +106,7 @@ Create the file pipeline/risk_manifest.json with this structure:
   "triggers": ["list of what triggered the risk level"],
   "mandatory_agents": ["security-auditor", "performance-reviewer", "architecture-reviewer"],
   "tags": ["zero or more of: pricing, frontend, backend, infra, product"],
-  "lane": "express | bugfix-known | bugfix-unknown | feature-fast | feature-full",
+  "lane": "express | docs | bugfix-known | bugfix-unknown | feature-fast | feature-full",
   "sprint_count": 3,
   "human_gates": 3
 }
@@ -123,6 +123,10 @@ Tags gate the Conditional Specialists below.
 Also set lane (the task class — see Adaptive Lanes below):
 - express        — typo, rename, comment, formatting, config / dependency-
                     version bump; no logic change
+- docs           — PURELY documentation / prose / template-text / doc-comment
+                    edits with ZERO executable-code or logic change (e.g.
+                    README, agent/command markdown, doc comments); if any
+                    code/logic is touched, this lane does NOT apply
 - bugfix-known   — clear reproduction, localized, the fix is obvious/known
 - bugfix-unknown — a bug whose root cause is not yet known / no clean repro
 - feature-fast   — small feature, or one whose high-level design already exists
@@ -135,6 +139,20 @@ file upload / user-generated content), Triage MUST set lane = feature-full
 regardless of how small the surface looks. When uncertain between two lanes,
 pick the heavier one. A lane may only *reduce* ceremony for genuinely
 low-risk work — it can never strip a security gate.
+
+**docs-lane additional fail-safe:** the docs lane is permitted ONLY when
+risk_level is LOW, no risk_flag is set, AND the change touches zero
+executable code or logic. If any executable file is modified, Triage MUST
+NOT select the docs lane — fall back to express (for trivial code changes)
+or the appropriate code lane.
+
+**Honour project scope-down guidance:** before finalising tags and
+mandatory_agents, read any scope-down / "Pipeline Scope" notes in
+`.claude/project/`. If those notes declare specific optional specialists
+as Not-Applicable for this project, remove those specialists from the
+active set — do not re-deliberate them. This applies to conditional /
+optional specialists only; it never removes a mandatory security gate (see
+Conditional Specialists → Project scope-down is authoritative).
 
 Default to HIGH for any security project. When uncertain, go higher, not lower.
 
@@ -152,6 +170,15 @@ feature-full, no exceptions.
   `npm run lint` + `npm run test`; no Phase 4; no Phases 5–7. The three Human
   Gates collapse into ONE lightweight, Translator-passed confirmation (see
   Human Gate Rules). Permitted ONLY when risk_level is LOW and no risk_flag.
+- **docs** — for changes that are PURELY documentation / prose / template-text
+  / doc-comment edits with ZERO executable-code or logic change. Skip Phases
+  0.5 / 1 / 2; Haiku applies the edit directly; run a lightweight lint check
+  if applicable (e.g. `npm run lint`); no Phase 4 (no code-logic surface); no
+  Phases 5–7 test generation. The three Human Gates collapse into ONE
+  lightweight, Translator-passed confirmation — exactly mirroring the express
+  lane. The human still explicitly approves once; the gate is merged, never
+  skipped. Permitted ONLY when risk_level is LOW, no risk_flag is set, and
+  zero executable code is touched (see docs-lane additional fail-safe above).
 - **bugfix-known** — skip Phase 0.5; Phase 1 is a one-paragraph fix plan with
   NO Red Team loop and no score gate; light translated Gate 1; one scoped
   task contract; implement on Haiku (Sonnet if logic is non-trivial); Phase 4
@@ -169,9 +196,9 @@ feature-full, no exceptions.
   Unchanged. This is the default and the fail-safe target.
 
 The Phase-1 Optional Recommendations block applies only to feature-fast and
-feature-full. It is suppressed for express and the bugfix lanes (a targeted
-fix must not attract scope-expanding suggestions) unless the user explicitly
-asks for recommendations.
+feature-full. It is suppressed for express, docs, and the bugfix lanes (a
+targeted fix or a pure-prose edit must not attract scope-expanding suggestions)
+unless the user explicitly asks for recommendations.
 
 ---
 
@@ -199,6 +226,19 @@ Rules:
   specific enough to need a checklist).
 - Conditional specialists run inside the existing phases and BEFORE the
   relevant Human Gate. They never bypass, replace, or pre-empt a gate.
+- **Project scope-down is authoritative (no re-deliberation):** if
+  `.claude/project/` context explicitly declares one or more optional
+  specialists as Not-Applicable for this project (e.g. a "Pipeline Scope"
+  or scope-down note), Triage MUST hard-skip those specialists on every
+  run — it does NOT re-evaluate whether they might apply this time. This
+  rule exists to prevent repeated deliberation over agents that the project
+  owner has already reasoned about and ruled out. Safety constraints: (a)
+  scope-down can only REMOVE optional/conditional specialists — it can
+  never skip the security-auditor when risk_level is HIGH or any risk_flag
+  is set, and the Phase-0 lane fail-safe still governs; (b) if the user
+  explicitly requests a skipped specialist on a given run, honor that
+  request for that run only (it is not a permanent reversal of the
+  scope-down).
 
 ### Bounded Phase-1 Constraint Round (opt-in escalation)
 
@@ -386,6 +426,7 @@ still governs):
   architecture (performance only if the change is performance-relevant).
 - LOW → architecture only.
 - express → no Phase 4 (no code-logic surface).
+- docs → no Phase 4 (no executable code, no security surface).
 security-auditor is **never** gated out when risk_level is HIGH or any
 auth / pii / payment / public-facing-API risk_flag is set — no lane can
 downgrade this. bugfix-unknown always runs the full set (side-effect risk).
@@ -417,7 +458,7 @@ Run simultaneously:
 1. Unit Test Agent using .claude/agents/test-writer.md
 2. Integration Test Agent using .claude/agents/test-writer.md with integration flag
 3. Docs Agent using .claude/agents/docs-writer.md
-4. E2E Test Writer using .claude/agents/e2e-test-writer.md — reads pipeline/qa-checklist.md and writes Playwright tests in e2e/ tagged @critical/@functional/@non-blocker. Bootstraps playwright.config.ts and the test:e2e npm script on first run if they do not exist. Only runs for feature-fast and feature-full lanes (skipped for express and bugfix lanes unless explicitly requested).
+4. E2E Test Writer using .claude/agents/e2e-test-writer.md — reads pipeline/qa-checklist.md and writes Playwright tests in e2e/ tagged @critical/@functional/@non-blocker. Bootstraps playwright.config.ts and the test:e2e npm script on first run if they do not exist. Only runs for feature-fast and feature-full lanes (skipped for express, docs, and bugfix lanes unless explicitly requested).
 
 ---
 
@@ -486,12 +527,13 @@ If user says yes, go ahead, approved, or similar → proceed
 If user asks questions → answer fully before proceeding
 If user says stop or cancel → halt and summarise what was completed
 
-Express-lane gate collapse: the express lane (and the docs lane, when later
-added) MERGES the three gates into ONE lightweight confirmation, shown — still
+Express-lane and docs-lane gate collapse: the express lane and the docs lane
+each MERGE the three gates into ONE lightweight confirmation, shown — still
 Translator-passed — before the change is finalised. Permitted ONLY when
-risk_level is LOW and no risk_flag is set. The gate is merged, never skipped:
-the human still explicitly approves once. Every other lane keeps all three
-gates. HIGH risk or any risk_flag is never collapse-eligible (see the Phase-0
+risk_level is LOW, no risk_flag is set, and (for the docs lane) zero
+executable code is touched. The gate is merged, never skipped: the human
+still explicitly approves once. Every other lane keeps all three gates.
+HIGH risk or any risk_flag is never collapse-eligible (see the Phase-0
 lane fail-safe).
 
 At Gate 1 only, the orchestrator may also present optional AI recommendations: capped at 2 AI-initiated recommend→re-plan rounds, never auto-applied, never a replacement for the gate. Requirements the user adds are uncapped and always honored (see Phase 1 → Optional Recommendations).
@@ -511,7 +553,7 @@ Collated epic/delivery documents (epic-doc-writer) → Use mid-tier model (Sonne
 
 Never use a fast model for security reasoning. Never use a slow expensive model for mechanical tasks like boilerplate or documentation.
 
-Lane sizing (see Adaptive Lanes) selects the model per phase: express → Haiku end-to-end; bugfix-known → Haiku/Sonnet; bugfix-unknown → Sonnet diagnosis then normal phase models; feature-fast / feature-full → as per the table. The lane fail-safe overrides any sizing: HIGH risk / any risk_flag ⇒ feature-full models, security-auditor Opus/max.
+Lane sizing (see Adaptive Lanes) selects the model per phase: express → Haiku end-to-end; docs → Haiku end-to-end (lightest ceremony, prose-only); bugfix-known → Haiku/Sonnet; bugfix-unknown → Sonnet diagnosis then normal phase models; feature-fast / feature-full → as per the table. The lane fail-safe overrides any sizing: HIGH risk / any risk_flag ⇒ feature-full models, security-auditor Opus/max.
 
 ---
 
@@ -705,7 +747,7 @@ FINAL RECOMMENDATION
 ## General Rules
 
 1. Never guess on security decisions. If uncertain, stop and ask.
-2. Never skip a Human Gate even if the next phase seems obvious (exception: the express lane merges the three gates into one lightweight confirmation — see Human Gate Rules — it never *skips* the human).
+2. Never skip a Human Gate even if the next phase seems obvious (exception: the express lane and the docs lane each merge the three gates into one lightweight confirmation — see Human Gate Rules — the gate is merged, never skipped, and the human still explicitly approves once).
 3. Always explain decisions in plain English alongside any technical output.
 4. If you find something alarming at any phase, surface it immediately. Do not wait for the review phase.
 5. Keep pipeline/progress.md updated after every phase, and regenerate the root TODO.md from pipeline/tasks/ at every phase boundary (orchestrator is the sole writer; agents read-only). After each agent delegation, append one row to pipeline/token-usage.md (see Pipeline Token Log).
