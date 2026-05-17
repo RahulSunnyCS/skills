@@ -1,0 +1,9 @@
+{
+  "name": "claude-web-dev-skills",
+  "version": "1.0.0",
+  "description": "Reusable Claude Code autonomous pipeline — 12 agents, 11 slash commands, and CLAUDE.md for any web project",
+  "license": "MIT",
+  "engines": { "node": ">=18" },
+  "bin": { "claude-pipeline": "./bin/claude-pipeline.js" },
+  "dependencies": {}
+}

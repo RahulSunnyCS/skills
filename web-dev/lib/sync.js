@@ -1,0 +1,190 @@
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const readline = require('readline');
+
+const PACKAGE_ROOT = path.resolve(__dirname, '..');
+const TEMPLATE_DIR = path.join(PACKAGE_ROOT, 'template');
+const VERSION_FILE = path.join('.claude', '.pipeline-version');
+
+function sha256ofStr(str) {
+  return crypto.createHash('sha256').update(str).digest('hex');
+}
+
+function sha256ofFile(filePath) {
+  return sha256ofStr(fs.readFileSync(filePath, 'utf8'));
+}
+
+function packageVersion() {
+  return JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8')).version;
+}
+
+function readVersionMarker(projectRoot) {
+  const p = path.join(projectRoot, VERSION_FILE);
+  return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null;
+}
+
+function writeVersionMarker(projectRoot, claudeMdHash) {
+  const p = path.join(projectRoot, VERSION_FILE);
+  fs.writeFileSync(
+    p,
+    JSON.stringify(
+      {
+        package: 'claude-web-dev-skills',
+        version: packageVersion(),
+        synced_at: new Date().toISOString(),
+        claude_md_sha256: claudeMdHash,
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+}
+
+function copyDir(srcDir, destDir) {
+  fs.mkdirSync(destDir, { recursive: true });
+  let count = 0;
+  for (const f of fs.readdirSync(srcDir)) {
+    fs.copyFileSync(path.join(srcDir, f), path.join(destDir, f));
+    count++;
+  }
+  return count;
+}
+
+async function prompt(question) {
+  if (!process.stdin.isTTY) {
+    console.warn(`  (non-TTY — defaulting to NO) ${question}`);
+    return false;
+  }
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) =>
+    rl.question(`${question} [y/N] `, (a) => {
+      rl.close();
+      resolve(a.trim().toLowerCase() === 'y');
+    }),
+  );
+}
+
+async function init(projectRoot) {
+  if (readVersionMarker(projectRoot)) {
+    console.log('Already initialised. Run `sync` to update.');
+    process.exit(0);
+  }
+
+  fs.mkdirSync(path.join(projectRoot, '.claude', 'agents'), { recursive: true });
+  fs.mkdirSync(path.join(projectRoot, '.claude', 'commands'), { recursive: true });
+
+  const agentCount = copyDir(
+    path.join(TEMPLATE_DIR, '.claude', 'agents'),
+    path.join(projectRoot, '.claude', 'agents'),
+  );
+  const commandCount = copyDir(
+    path.join(TEMPLATE_DIR, '.claude', 'commands'),
+    path.join(projectRoot, '.claude', 'commands'),
+  );
+
+  const templateContent = fs.readFileSync(path.join(TEMPLATE_DIR, 'CLAUDE.md'), 'utf8');
+  const destClaudeMd = path.join(projectRoot, 'CLAUDE.md');
+
+  if (fs.existsSync(destClaudeMd)) {
+    const existing = fs.readFileSync(destClaudeMd, 'utf8');
+    if (existing !== templateContent) {
+      console.log('\nCLAUDE.md already exists with different content.');
+      const ok = await prompt('Overwrite CLAUDE.md?');
+      if (!ok) {
+        console.log('  Skipped CLAUDE.md — merge manually.');
+        writeVersionMarker(projectRoot, sha256ofStr(templateContent));
+        printSummary(agentCount, commandCount, 'skipped');
+        return;
+      }
+    }
+  }
+
+  fs.writeFileSync(destClaudeMd, templateContent);
+  writeVersionMarker(projectRoot, sha256ofStr(templateContent));
+  printSummary(agentCount, commandCount, 'written');
+}
+
+async function sync(projectRoot, checkOnly) {
+  const marker = readVersionMarker(projectRoot);
+  if (!marker) {
+    console.error('Not initialised. Run `init` first.');
+    process.exit(1);
+  }
+
+  const changed = [];
+
+  for (const area of ['agents', 'commands']) {
+    const srcDir = path.join(TEMPLATE_DIR, '.claude', area);
+    const destDir = path.join(projectRoot, '.claude', area);
+    fs.mkdirSync(destDir, { recursive: true });
+    for (const f of fs.readdirSync(srcDir)) {
+      const src = path.join(srcDir, f);
+      const dest = path.join(destDir, f);
+      const srcContent = fs.readFileSync(src, 'utf8');
+      if (!fs.existsSync(dest) || fs.readFileSync(dest, 'utf8') !== srcContent) {
+        changed.push(`.claude/${area}/${f}`);
+        if (!checkOnly) fs.copyFileSync(src, dest);
+      }
+    }
+  }
+
+  const templateContent = fs.readFileSync(path.join(TEMPLATE_DIR, 'CLAUDE.md'), 'utf8');
+  const templateHash = sha256ofStr(templateContent);
+  const destClaudeMd = path.join(projectRoot, 'CLAUDE.md');
+
+  if (templateHash !== marker.claude_md_sha256) {
+    const localHash = fs.existsSync(destClaudeMd) ? sha256ofFile(destClaudeMd) : null;
+    if (localHash === marker.claude_md_sha256 || localHash === null) {
+      changed.push('CLAUDE.md');
+      if (!checkOnly) fs.writeFileSync(destClaudeMd, templateContent);
+    } else {
+      console.log('\n⚠  CLAUDE.md has local modifications AND the template changed.');
+      if (!checkOnly) {
+        const ok = await prompt('Overwrite CLAUDE.md? (local changes will be lost)');
+        if (ok) {
+          changed.push('CLAUDE.md');
+          fs.writeFileSync(destClaudeMd, templateContent);
+        } else {
+          console.log('  CLAUDE.md skipped — merge manually.');
+        }
+      } else {
+        changed.push('CLAUDE.md (conflict: local edits + template changed)');
+      }
+    }
+  }
+
+  if (checkOnly) {
+    if (changed.length === 0) {
+      console.log('✓ Pipeline files are up to date.');
+      process.exit(0);
+    } else {
+      console.log(`✗ ${changed.length} file(s) out of sync:\n  ${changed.join('\n  ')}`);
+      process.exit(1);
+    }
+  }
+
+  writeVersionMarker(projectRoot, templateHash);
+
+  if (changed.length === 0) {
+    console.log('✓ Already up to date.');
+  } else {
+    console.log(`\n✓ Updated ${changed.length} file(s):\n  ${changed.join('\n  ')}\n`);
+    console.log(`Run: git diff .claude/ CLAUDE.md`);
+    console.log(`Then: git commit -m "chore: sync claude-web-dev-skills to v${packageVersion()}"`);
+  }
+}
+
+function printSummary(agents, commands, claudeStatus) {
+  console.log(
+    `\n✓ ${agents} agents, ${commands} commands written. CLAUDE.md: ${claudeStatus}.\n`,
+  );
+  console.log('Next steps:');
+  console.log('  1. git add CLAUDE.md .claude/ && git commit -m "feat: add claude-web-dev-skills pipeline"');
+  console.log('  2. Open Claude Code → /setup-project   (fills .claude/project/ with your project context)');
+  console.log('  3. /start   (pipeline is live)');
+}
+
+module.exports = { init, sync };
