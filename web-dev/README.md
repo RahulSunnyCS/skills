@@ -25,7 +25,15 @@ Reusable Claude Code autonomous pipeline for any web project. One command gives 
 
 `/start` `/plan` `/implement` `/review` `/test` `/fix` `/grill-me` `/diagnose` `/qa-plan` `/epic-doc` `/setup-project`
 
-**`CLAUDE.md`** — full autonomous pipeline orchestrator with 7 phases, adaptive lanes (express → feature-full), risk triage, 3 Human Gates, and model/effort assignment.
+**`CLAUDE.md`** — full autonomous pipeline orchestrator with 7 phases, six
+adaptive lanes (`express` · `docs` · `bugfix-known` · `bugfix-unknown` ·
+`feature-fast` · `feature-full`), risk triage with a non-negotiable
+fail-safe, 3 Human Gates, and model/effort assignment. The `express` and
+`docs` lanes collapse the three gates into one lightweight confirmation so a
+typo or a prose edit doesn't drag the full machinery.
+
+📊 **See [`docs/workflows/`](../docs/workflows/README.md)** for the full
+pipeline, lane-selection, and gate diagrams (Mermaid).
 
 ---
 
@@ -139,9 +147,10 @@ Run `/setup-project` in Claude Code and it will interview you and write these fi
 
 ```
 claude-web-dev-skills/
-├── package.json                  # bin field only, zero dependencies
+├── package.json                  # bin + scripts, zero runtime dependencies
 ├── bin/claude-pipeline.js        # CLI entry point
 ├── lib/sync.js                   # copy logic (init + sync)
+├── test/sync.test.js             # zero-dep tests (node:test)
 ├── README.md
 └── template/
     ├── CLAUDE.md                 # generic pipeline orchestrator
@@ -149,6 +158,19 @@ claude-web-dev-skills/
         ├── agents/               # 12 specialist agent definitions
         └── commands/             # 11 slash command definitions
 ```
+
+## Development
+
+Zero runtime dependencies; tests use only Node's built-in test runner
+(Node ≥18). From the package root (`web-dev/`):
+
+```bash
+npm test        # node --test — runs test/*.test.js
+npm run lint    # node --check — syntax-checks all source + test files
+```
+
+`npm test` and `npm run lint` exist so the pipeline's `express` lane can
+self-verify trivial code changes without escalating to a heavier lane.
 
 ## Versioning
 
