@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const readline = require('readline');
+const { execSync } = require('child_process');
+const os = require('os');
 
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
 const TEMPLATE_DIR = path.join(PACKAGE_ROOT, 'template');
@@ -187,4 +189,55 @@ function printSummary(agents, commands, claudeStatus) {
   console.log('  3. /start   (pipeline is live)');
 }
 
-module.exports = { init, sync };
+async function publish(sourceUrl, skillName) {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(skillName)) {
+    throw new Error('Skill name must be lowercase alphanumeric with hyphens (e.g. ecommerce, my-workflow)');
+  }
+
+  const skillDir = path.join(PACKAGE_ROOT, 'skills', skillName);
+
+  if (fs.existsSync(skillDir)) {
+    const ok = await prompt(`skill '${skillName}' already exists — overwrite?`);
+    if (!ok) {
+      console.log('Aborted.');
+      process.exit(0);
+    }
+  }
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cwds-publish-'));
+  try {
+    console.log(`\nCloning ${sourceUrl} ...`);
+    execSync(`git clone --depth 1 ${sourceUrl} ${tmpDir}`, { stdio: 'inherit' });
+
+    const srcAgents   = path.join(tmpDir, '.claude', 'agents');
+    const srcCommands = path.join(tmpDir, '.claude', 'commands');
+    const srcClaude   = path.join(tmpDir, 'CLAUDE.md');
+
+    const hasAgents   = fs.existsSync(srcAgents);
+    const hasCommands = fs.existsSync(srcCommands);
+    const hasClaude   = fs.existsSync(srcClaude);
+
+    if (!hasAgents && !hasCommands && !hasClaude) {
+      throw new Error('Source repo has no pipeline files (.claude/agents/, .claude/commands/, CLAUDE.md).');
+    }
+
+    fs.mkdirSync(path.join(skillDir, '.claude', 'agents'),   { recursive: true });
+    fs.mkdirSync(path.join(skillDir, '.claude', 'commands'), { recursive: true });
+
+    const agentCount   = hasAgents   ? copyDir(srcAgents,   path.join(skillDir, '.claude', 'agents'))   : 0;
+    const commandCount = hasCommands ? copyDir(srcCommands, path.join(skillDir, '.claude', 'commands')) : 0;
+
+    if (hasClaude) fs.copyFileSync(srcClaude, path.join(skillDir, 'CLAUDE.md'));
+
+    console.log(`\n✓ Skill '${skillName}' written to web-dev/skills/${skillName}/`);
+    console.log(`  ${agentCount} agents, ${commandCount} commands${hasClaude ? ', CLAUDE.md' : ''}\n`);
+    console.log('Next steps:');
+    console.log(`  git add web-dev/skills/${skillName}/`);
+    console.log(`  git commit -m "feat: add skill ${skillName} from ${sourceUrl}"`);
+    console.log('  git push');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+module.exports = { init, sync, publish };
