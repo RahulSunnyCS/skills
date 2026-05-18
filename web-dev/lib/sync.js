@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const readline = require('readline');
+const { execSync } = require('child_process');
+const os = require('os');
 
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
 const TEMPLATE_DIR = path.join(PACKAGE_ROOT, 'template');
@@ -63,6 +65,18 @@ async function prompt(question) {
     rl.question(`${question} [y/N] `, (a) => {
       rl.close();
       resolve(a.trim().toLowerCase() === 'y');
+    }),
+  );
+}
+
+async function ask(question, defaultValue) {
+  if (!process.stdin.isTTY) return defaultValue;
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const hint = defaultValue ? ` (${defaultValue})` : '';
+  return new Promise((resolve) =>
+    rl.question(`${question}${hint}: `, (a) => {
+      rl.close();
+      resolve(a.trim() || defaultValue || '');
     }),
   );
 }
@@ -183,8 +197,125 @@ function printSummary(agents, commands, claudeStatus) {
   );
   console.log('Next steps:');
   console.log('  1. git add CLAUDE.md .claude/ && git commit -m "feat: add claude-web-dev-skills pipeline"');
-  console.log('  2. Open Claude Code → /setup-project   (fills .claude/project/ with your project context)');
-  console.log('  3. /start   (pipeline is live)');
+  console.log('  2. npm run setup   ← fill .claude/project/ now (takes ~2 min)');
+  console.log('  3. Open Claude Code and run: /plan <your first task>');
 }
 
-module.exports = { init, sync };
+async function publish(sourceUrl, skillName) {
+  if (!skillName) {
+    skillName = sourceUrl.replace(/\.git$/, '').split('/').filter(Boolean).pop().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  }
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(skillName)) {
+    throw new Error('Skill name must be lowercase alphanumeric with hyphens (e.g. ecommerce, my-workflow)');
+  }
+
+  const skillDir = path.join(PACKAGE_ROOT, 'skills', skillName);
+
+  if (fs.existsSync(skillDir)) {
+    const ok = await prompt(`skill '${skillName}' already exists — overwrite?`);
+    if (!ok) {
+      console.log('Aborted.');
+      process.exit(0);
+    }
+  }
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cwds-publish-'));
+  try {
+    console.log(`\nCloning ${sourceUrl} ...`);
+    execSync(`git clone --depth 1 ${sourceUrl} ${tmpDir}`, { stdio: 'inherit' });
+
+    const srcAgents   = path.join(tmpDir, '.claude', 'agents');
+    const srcCommands = path.join(tmpDir, '.claude', 'commands');
+    const srcClaude   = path.join(tmpDir, 'CLAUDE.md');
+
+    const hasAgents   = fs.existsSync(srcAgents);
+    const hasCommands = fs.existsSync(srcCommands);
+    const hasClaude   = fs.existsSync(srcClaude);
+
+    if (!hasAgents && !hasCommands && !hasClaude) {
+      throw new Error('Source repo has no pipeline files (.claude/agents/, .claude/commands/, CLAUDE.md).');
+    }
+
+    fs.mkdirSync(path.join(skillDir, '.claude', 'agents'),   { recursive: true });
+    fs.mkdirSync(path.join(skillDir, '.claude', 'commands'), { recursive: true });
+
+    const agentCount   = hasAgents   ? copyDir(srcAgents,   path.join(skillDir, '.claude', 'agents'))   : 0;
+    const commandCount = hasCommands ? copyDir(srcCommands, path.join(skillDir, '.claude', 'commands')) : 0;
+
+    if (hasClaude) fs.copyFileSync(srcClaude, path.join(skillDir, 'CLAUDE.md'));
+
+    console.log(`\n✓ Skill '${skillName}' written to web-dev/skills/${skillName}/`);
+    console.log(`  ${agentCount} agents, ${commandCount} commands${hasClaude ? ', CLAUDE.md' : ''}\n`);
+    console.log('Next steps:');
+    console.log(`  git add web-dev/skills/${skillName}/`);
+    console.log(`  git commit -m "feat: add skill ${skillName} from ${sourceUrl}"`);
+    console.log('  git push');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+async function setup(projectRoot) {
+  if (!readVersionMarker(projectRoot)) {
+    console.error('Pipeline not initialised. Run `init` first.');
+    process.exit(1);
+  }
+
+  const projectDir = path.join(projectRoot, '.claude', 'project');
+  const files = {
+    overview: path.join(projectDir, 'overview.md'),
+    business: path.join(projectDir, 'business.md'),
+    technical: path.join(projectDir, 'technical.md'),
+  };
+
+  const anyExists = Object.values(files).some((f) => fs.existsSync(f));
+  if (anyExists) {
+    const ok = await prompt('.claude/project/ files already exist — overwrite?');
+    if (!ok) { console.log('Aborted.'); process.exit(0); }
+  }
+
+  console.log('\n── Project context setup ──────────────────────────────────────────');
+  console.log('Answer each question. Press Enter to keep the example shown in brackets.\n');
+
+  const name      = await ask('Project name', path.basename(projectRoot));
+  const what      = await ask('What does it do? (one sentence)');
+  const who       = await ask('Who uses it?', 'developers');
+  const stack     = await ask('Tech stack', 'Node.js');
+  const commands  = await ask('Key commands (dev / test / build / lint)');
+  const patterns  = await ask('Architecture patterns or conventions to follow');
+  const gotchas   = await ask('Any gotchas or non-obvious constraints');
+  const bizModel  = await ask('Business model', 'open source');
+  const tiers     = await ask('Pricing tiers / billing rules', 'none');
+
+  fs.mkdirSync(projectDir, { recursive: true });
+
+  fs.writeFileSync(files.overview,
+    `# Project Overview\n\n**${name}** — ${what}\n\n## Audience\n\n${who}\n`);
+
+  fs.writeFileSync(files.business,
+    `# Business & Product Context\n\n## Business model\n\n${bizModel}\n\n## Tiers / Billing\n\n${tiers}\n`);
+
+  const techLines = [
+    `# Technical Context\n`,
+    `## Tech Stack\n\n${stack}\n`,
+    commands  ? `## Essential Commands\n\n\`\`\`\n${commands}\n\`\`\`\n` : '',
+    patterns  ? `## Key Patterns & Conventions\n\n${patterns}\n` : '',
+    gotchas   ? `## Gotchas\n\n${gotchas}\n` : '',
+  ];
+  fs.writeFileSync(files.technical, techLines.filter(Boolean).join('\n'));
+
+  console.log('\n✓ .claude/project/ written\n');
+  console.log('────────────────────────────────────────────────────────────────────');
+  console.log('Next — open Claude Code in this directory and run:\n');
+  console.log('  /start        → repo assessment (first time or unfamiliar codebase)');
+  console.log('  /plan <task>  → plan a feature or fix (most common starting point)\n');
+  console.log('Typical first session:');
+  console.log('  /plan Add <your first feature here>\n');
+  console.log('The pipeline will triage, plan, review, implement, and test —');
+  console.log('stopping at Human Gates for your approval before each major step.');
+  console.log('────────────────────────────────────────────────────────────────────\n');
+  console.log('Commit the context files:');
+  console.log('  git add .claude/project/ && git commit -m "docs: add project context"\n');
+}
+
+module.exports = { init, sync, publish, setup };

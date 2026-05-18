@@ -7,7 +7,9 @@
   "bin": { "claude-pipeline": "./bin/claude-pipeline.js" },
   "scripts": {
     "test": "node --test",
-    "lint": "node --check bin/claude-pipeline.js && node --check lib/sync.js && node --check test/sync.test.js"
+    "lint": "node --check bin/claude-pipeline.js && node --check lib/sync.js && node --check test/sync.test.js",
+    "setup": "node bin/claude-pipeline.js setup",
+    "skill:import": "node bin/claude-pipeline.js publish"
   },
   "dependencies": {}
 }

@@ -243,6 +243,32 @@ so Gate 1 is a clean yes/no rather than a negotiation.
 
 ---
 
+## Contributing your customisations back
+
+If you have modified agents, commands, or `CLAUDE.md` in your project and want
+to share that variant as a named skill, run this from the root of the
+`skills` repo:
+
+```bash
+node web-dev/bin/claude-pipeline.js publish https://github.com/you/your-repo ecommerce
+```
+
+This clones your repo, copies `.claude/agents/`, `.claude/commands/`, and
+`CLAUDE.md` into `web-dev/skills/ecommerce/`, then prints the commit
+instructions. Your project-specific `.claude/project/` and `settings.json`
+are never copied — only the pipeline files.
+
+```bash
+git add web-dev/skills/ecommerce/
+git commit -m "feat: add skill ecommerce from https://github.com/you/your-repo"
+git push
+```
+
+Each named skill lives independently under `web-dev/skills/` and does not
+affect the default template.
+
+---
+
 ## Keeping the pipeline up to date
 
 Pull in the latest agents, commands, and `CLAUDE.md` from the upstream
