@@ -18,7 +18,7 @@ minutes. No npm account, no global install.
 Run this once from the root of your project:
 
 ```bash
-npx github:rahulsunnycs/claude-web-dev-skills init
+npx github:rahulsunnycs/skills init
 ```
 
 This writes the following into your project root:
@@ -254,7 +254,7 @@ Pull in the latest agents, commands, and `CLAUDE.md` from the upstream
 template:
 
 ```bash
-npx github:rahulsunnycs/claude-web-dev-skills sync
+npx github:rahulsunnycs/skills sync
 git diff .claude/ CLAUDE.md     # review what changed
 git commit -m "chore: sync claude-web-dev-skills"
 ```
@@ -266,13 +266,13 @@ and prompts you before overwriting.
 ### Pin to a specific version
 
 ```bash
-npx github:rahulsunnycs/claude-web-dev-skills#v1.0.0 init
+npx github:rahulsunnycs/skills#v1.0.0 init
 ```
 
 ### Validate in CI (no writes)
 
 ```bash
-npx github:rahulsunnycs/claude-web-dev-skills sync --check
+npx github:rahulsunnycs/skills sync --check
 ```
 
 Exits non-zero if any pipeline file is out of date. Safe to add as a CI
@@ -300,7 +300,7 @@ you. The pipeline never overwrites your project context or local settings.
 
 ```json
 "scripts": {
-  "pipeline:sync": "npx github:rahulsunnycs/claude-web-dev-skills sync"
+  "pipeline:sync": "npx github:rahulsunnycs/skills sync"
 }
 ```
 
