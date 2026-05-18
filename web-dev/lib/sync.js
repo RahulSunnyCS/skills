@@ -69,6 +69,18 @@ async function prompt(question) {
   );
 }
 
+async function ask(question, defaultValue) {
+  if (!process.stdin.isTTY) return defaultValue;
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const hint = defaultValue ? ` (${defaultValue})` : '';
+  return new Promise((resolve) =>
+    rl.question(`${question}${hint}: `, (a) => {
+      rl.close();
+      resolve(a.trim() || defaultValue || '');
+    }),
+  );
+}
+
 async function init(projectRoot) {
   if (readVersionMarker(projectRoot)) {
     console.log('Already initialised. Run `sync` to update.');
@@ -185,8 +197,8 @@ function printSummary(agents, commands, claudeStatus) {
   );
   console.log('Next steps:');
   console.log('  1. git add CLAUDE.md .claude/ && git commit -m "feat: add claude-web-dev-skills pipeline"');
-  console.log('  2. Open Claude Code → /setup-project   (fills .claude/project/ with your project context)');
-  console.log('  3. /start   (pipeline is live)');
+  console.log('  2. npm run setup   ← fill .claude/project/ now (takes ~2 min)');
+  console.log('  3. Open Claude Code and run: /plan <your first task>');
 }
 
 async function publish(sourceUrl, skillName) {
@@ -243,4 +255,67 @@ async function publish(sourceUrl, skillName) {
   }
 }
 
-module.exports = { init, sync, publish };
+async function setup(projectRoot) {
+  if (!readVersionMarker(projectRoot)) {
+    console.error('Pipeline not initialised. Run `init` first.');
+    process.exit(1);
+  }
+
+  const projectDir = path.join(projectRoot, '.claude', 'project');
+  const files = {
+    overview: path.join(projectDir, 'overview.md'),
+    business: path.join(projectDir, 'business.md'),
+    technical: path.join(projectDir, 'technical.md'),
+  };
+
+  const anyExists = Object.values(files).some((f) => fs.existsSync(f));
+  if (anyExists) {
+    const ok = await prompt('.claude/project/ files already exist — overwrite?');
+    if (!ok) { console.log('Aborted.'); process.exit(0); }
+  }
+
+  console.log('\n── Project context setup ──────────────────────────────────────────');
+  console.log('Answer each question. Press Enter to keep the example shown in brackets.\n');
+
+  const name      = await ask('Project name', path.basename(projectRoot));
+  const what      = await ask('What does it do? (one sentence)');
+  const who       = await ask('Who uses it?', 'developers');
+  const stack     = await ask('Tech stack', 'Node.js');
+  const commands  = await ask('Key commands (dev / test / build / lint)');
+  const patterns  = await ask('Architecture patterns or conventions to follow');
+  const gotchas   = await ask('Any gotchas or non-obvious constraints');
+  const bizModel  = await ask('Business model', 'open source');
+  const tiers     = await ask('Pricing tiers / billing rules', 'none');
+
+  fs.mkdirSync(projectDir, { recursive: true });
+
+  fs.writeFileSync(files.overview,
+    `# Project Overview\n\n**${name}** — ${what}\n\n## Audience\n\n${who}\n`);
+
+  fs.writeFileSync(files.business,
+    `# Business & Product Context\n\n## Business model\n\n${bizModel}\n\n## Tiers / Billing\n\n${tiers}\n`);
+
+  const techLines = [
+    `# Technical Context\n`,
+    `## Tech Stack\n\n${stack}\n`,
+    commands  ? `## Essential Commands\n\n\`\`\`\n${commands}\n\`\`\`\n` : '',
+    patterns  ? `## Key Patterns & Conventions\n\n${patterns}\n` : '',
+    gotchas   ? `## Gotchas\n\n${gotchas}\n` : '',
+  ];
+  fs.writeFileSync(files.technical, techLines.filter(Boolean).join('\n'));
+
+  console.log('\n✓ .claude/project/ written\n');
+  console.log('────────────────────────────────────────────────────────────────────');
+  console.log('Next — open Claude Code in this directory and run:\n');
+  console.log('  /start        → repo assessment (first time or unfamiliar codebase)');
+  console.log('  /plan <task>  → plan a feature or fix (most common starting point)\n');
+  console.log('Typical first session:');
+  console.log('  /plan Add <your first feature here>\n');
+  console.log('The pipeline will triage, plan, review, implement, and test —');
+  console.log('stopping at Human Gates for your approval before each major step.');
+  console.log('────────────────────────────────────────────────────────────────────\n');
+  console.log('Commit the context files:');
+  console.log('  git add .claude/project/ && git commit -m "docs: add project context"\n');
+}
+
+module.exports = { init, sync, publish, setup };
