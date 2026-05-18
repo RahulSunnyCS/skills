@@ -28,7 +28,7 @@ your-project/
 ├── CLAUDE.md                   ← pipeline orchestrator (do not hand-edit)
 └── .claude/
     ├── .pipeline-version       ← version marker (tracks sync state)
-    ├── agents/                 ← 12 specialist agent definitions
+    ├── agents/                 ← 15 specialist agent definitions
     │   ├── architecture-reviewer.md
     │   ├── docs-writer.md
     │   ├── e2e-test-writer.md
@@ -38,10 +38,13 @@ your-project/
     │   ├── pricing-reviewer.md
     │   ├── qa-planner.md
     │   ├── red-team.md
+    │   ├── regression-analyst.md
+    │   ├── retrospective-reviewer.md
     │   ├── security-auditor.md
+    │   ├── senior-software-engineer.md
     │   ├── test-writer.md
     │   └── translator.md
-    └── commands/               ← 11 slash commands
+    └── commands/               ← 12 slash commands
         ├── diagnose.md
         ├── epic-doc.md
         ├── fix.md
@@ -52,7 +55,8 @@ your-project/
         ├── review.md
         ├── setup-project.md
         ├── start.md
-        └── test.md
+        ├── test.md
+        └── triage.md
 ```
 
 > If a `CLAUDE.md` already exists, you will be prompted before it is
@@ -156,6 +160,7 @@ go straight to `/plan`.
 | `/review` | Security, performance, and architecture review → Human Gate 2 |
 | `/test` | Generate and run tests, with up to two auto-retry cycles |
 | `/fix` | Drive failing tests to green without re-running the full pipeline |
+| `/triage` | Classify failing tests (direct / collateral / external) and route each to the right fix path |
 | `/grill-me` | Clarify scope before planning — good for large or ambiguous tasks |
 | `/diagnose` | Root-cause investigation for a bug whose cause is unknown |
 | `/qa-plan` | Generate or refresh the QA checklist on demand |

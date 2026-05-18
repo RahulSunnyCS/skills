@@ -27,16 +27,24 @@ node web-dev/bin/claude-pipeline.js sync --check    # CI drift check (exit!=0 if
 node web-dev/bin/claude-pipeline.js --version
 ```
 
-There is **no `scripts` block** in package.json — no `dev`, `build`, `test`,
-or `lint` exist. `npm run lint` / `npm run test` (referenced by the express
-lane in CLAUDE.md) will fail here until added.
+Available npm scripts (run from `web-dev/`):
+
+```
+npm run lint          # node --check on bin/ and lib/ (no test file)
+npm run setup         # node bin/claude-pipeline.js setup
+npm run skill:import  # node bin/claude-pipeline.js publish
+```
+
+`npm run test` does not exist — `npm run lint` / `npm run test` referenced by
+the express lane in CLAUDE.md: lint passes, test will fail until a test runner
+is added.
 
 ## Repository Structure
 
 ```
 skills/
 ├── web-dev/                     # the actual npm package (source of truth)
-│   ├── package.json             # bin field only, zero deps
+│   ├── package.json             # bin + scripts (lint/setup/skill:import), zero deps
 │   ├── bin/claude-pipeline.js   # arg dispatch: init | sync | --version
 │   ├── lib/sync.js              # all copy/hash/prompt logic
 │   └── template/                # CANONICAL payload copied into consumers
@@ -81,8 +89,7 @@ None.
 - npm package root is `web-dev/`, not repo root — `npx github:rahulsunnycs/skills`
   would not resolve the package; the README's `claude-web-dev-skills` name
   assumes a matching repo/path. Flag if distribution behaviour is in scope.
-- No `scripts` in package.json → express-lane `npm run lint/test` will fail.
-- `web-dev/.DS_Store` is committed (noise).
+- `npm run test` is not defined — express-lane `npm run test` will fail until a test runner is added. `npm run lint` works.
 - Dogfooded root copies are generated artifacts; the source of truth for any
   agent/command/CLAUDE.md change is `web-dev/template/`.
 
