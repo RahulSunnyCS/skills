@@ -18,7 +18,7 @@ minutes. No npm account, no global install.
 Run this once from the root of your project:
 
 ```bash
-npx github:rahulsunnycs/claude-web-dev-skills init
+npx github:rahulsunnycs/skills init
 ```
 
 This writes the following into your project root:
@@ -169,6 +169,69 @@ go straight to `/plan`.
 
 ---
 
+## How the pipeline works
+
+The pipeline runs autonomously across phases separated by **three Human Gates** — nothing proceeds without your explicit approval at each gate. Phase 0 Triage picks a **lane** that right-sizes the ceremony to the task.
+
+### Lanes
+
+| Lane | When to use | Gates | Notes |
+|------|-------------|-------|-------|
+| `express` | Typo, rename, config bump — no logic change | **1 merged** | Haiku only; no Phase 4/5/6/7 |
+| `bugfix-known` | Clear repro, obvious fix | 1 / 2 / 3 | Mandatory regression test |
+| `bugfix-unknown` | Root cause not yet known | 1 / 2 / 3 | Phase 0.7 Diagnosis runs first |
+| `feature-fast` | Small feature or known design | 1 / 2 / 3 | 1 Red Team sprint |
+| `feature-full` | Novel or cross-cutting — **default** | 1 / 2 / 3 | Full pipeline |
+
+### Phase overview
+
+```
+Phase 0    Triage — Haiku classifies risk level and picks the lane
+Phase 0.5  Intent Extraction — optional /grill-me interview before planning
+Phase 0.7  Diagnosis — read-only root-cause investigation (bugfix-unknown only)
+Phase 1    Planning — Opus + Red Team loop + QA Planner
+                ↓  HUMAN GATE 1 — review the plan and approve
+Phase 2    Decomposition — break plan into atomic, parallelisable task contracts
+Phase 3    Parallel Implementation — scoped Implementor agents
+Phase 4    Consolidated Review — senior-software-engineer (Opus)
+             Security + performance + architecture in one pass
+             Emits escalation verdict → security-auditor deep-dive when any
+             risk flag (auth, PII, payment, public API…) is set
+Phase 4.5  Bounded Fix Cycle — runs only on CONDITIONAL PASS; parallel where
+             file scopes are disjoint, sequential otherwise; max 2 cycles
+                ↓  HUMAN GATE 2 — review findings and approve
+Phase 5    Test Generation — unit, integration, E2E, and docs in parallel
+Phase 6    Blast-Radius Validation → Regression Triage → Test Execution
+             Every failing test classified DIRECT / COLLATERAL / EXTERNAL
+             before any fix is delegated (see below)
+Phase 7.4  Pipeline Retrospective — feature-full only; three retrospective-reviewer
+             instances (conservative / medium / aggressive bias) analyse the run
+             itself and propose flow improvements; advisory, never auto-applied
+Phase 7    Final Review — epic doc written, translated summary presented
+                ↓  HUMAN GATE 3 — approve, request changes, or reject
+```
+
+### Phase 4 — Consolidated review
+
+A single `senior-software-engineer` (Opus) replaces the three separate specialist agents for all normal lanes. It covers security, performance, and architecture in one pass, then emits:
+
+- **OPUS DEEP-DIVE: REQUIRED** — when any risk flag is set (auth, PII, payment, public API, admin, file upload). The `security-auditor` always follows with a focused deep-dive. This path cannot be skipped by any lane or verdict.
+- **OPUS DEEP-DIVE: NOT REQUIRED** — discretionary when no risk flag is set. The consolidated report stands alone.
+
+At the very-hard/epic split (HIGH risk + ≥3 tags), the three dedicated specialists run in parallel instead of the consolidated agent.
+
+### Phase 6 — Regression Triage
+
+Every failing test is classified before any fix is delegated:
+
+| Class | Meaning | Action |
+|-------|---------|--------|
+| **DIRECT** | Test exercises code inside the current task's scope | Implementor fixes it — max 2 retries |
+| **COLLATERAL** | Shared component changed and broke an unrelated test | `regression-analyst` (Opus) — one bounded auto-fix inside the shared component; surfaces to you if architectural |
+| **EXTERNAL** | Flaky test, missing env var, port conflict, network issue | Surfaced to you — never blocks the gate |
+
+---
+
 ## Sample prompts — e-commerce example
 
 These show how to write effective `/plan` prompts. The pattern is: **what to
@@ -280,7 +343,7 @@ Pull in the latest agents, commands, and `CLAUDE.md` from the upstream
 template:
 
 ```bash
-npx github:rahulsunnycs/claude-web-dev-skills sync
+npx github:rahulsunnycs/skills sync
 git diff .claude/ CLAUDE.md     # review what changed
 git commit -m "chore: sync claude-web-dev-skills"
 ```
@@ -292,13 +355,13 @@ and prompts you before overwriting.
 ### Pin to a specific version
 
 ```bash
-npx github:rahulsunnycs/claude-web-dev-skills#v1.0.0 init
+npx github:rahulsunnycs/skills#v1.0.0 init
 ```
 
 ### Validate in CI (no writes)
 
 ```bash
-npx github:rahulsunnycs/claude-web-dev-skills sync --check
+npx github:rahulsunnycs/skills sync --check
 ```
 
 Exits non-zero if any pipeline file is out of date. Safe to add as a CI
@@ -326,7 +389,7 @@ you. The pipeline never overwrites your project context or local settings.
 
 ```json
 "scripts": {
-  "pipeline:sync": "npx github:rahulsunnycs/claude-web-dev-skills sync"
+  "pipeline:sync": "npx github:rahulsunnycs/skills sync"
 }
 ```
 
