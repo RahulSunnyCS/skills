@@ -190,6 +190,9 @@ function printSummary(agents, commands, claudeStatus) {
 }
 
 async function publish(sourceUrl, skillName) {
+  if (!skillName) {
+    skillName = sourceUrl.replace(/\.git$/, '').split('/').filter(Boolean).pop().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  }
   if (!/^[a-z0-9][a-z0-9-]*$/.test(skillName)) {
     throw new Error('Skill name must be lowercase alphanumeric with hyphens (e.g. ecommerce, my-workflow)');
   }

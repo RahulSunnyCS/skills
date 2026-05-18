@@ -16,8 +16,8 @@ switch (cmd) {
     break;
   case 'publish': {
     const [sourceUrl, skillName] = flags;
-    if (!sourceUrl || !skillName) {
-      console.error('Usage: publish <github-url> <skill-name>\n  e.g. publish https://github.com/user/repo1 ecommerce');
+    if (!sourceUrl) {
+      console.error('Usage: publish <github-url> [skill-name]\n  e.g. publish https://github.com/user/repo1\n       publish https://github.com/user/repo1 ecommerce');
       process.exit(1);
     }
     publish(sourceUrl, skillName).catch((err) => { console.error(err.message); process.exit(1); });
