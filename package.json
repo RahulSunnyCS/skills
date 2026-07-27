@@ -5,5 +5,9 @@
   "license": "MIT",
   "engines": { "node": ">=18" },
   "bin": { "claude-pipeline": "./web-dev/bin/claude-pipeline.js" },
+  "scripts": {
+    "lint": "node --check web-dev/bin/claude-pipeline.js && node --check web-dev/lib/sync.js",
+    "test": "node --test web-dev/test/**/*.test.js"
+  },
   "dependencies": {}
 }

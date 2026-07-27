@@ -6,7 +6,8 @@ purely as source consumed through `npx github:...`.
 
 ## Offering
 
-- The full pipeline payload (12 agents, 11 commands, CLAUDE.md) — free
+- The full pipeline payload (15 agents, 12 commands, CLAUDE.md +
+  `.claude/pipeline/` reference files) — free
 - `init` / `sync` / `sync --check` CLI — free
 
 ## Tiers

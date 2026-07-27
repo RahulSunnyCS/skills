@@ -5,9 +5,10 @@ A single-page map of how `claude-web-dev-skills` runs. The orchestrator
 *how deep* each phase runs — phase definitions never change, only their depth,
 model, and which gates collapse.
 
-> All diagrams below reflect `web-dev/skills/web-dev/CLAUDE.md` (the canonical
-> orchestrator). If you change a phase or lane there, update this file in the
-> same commit.
+> All diagrams below reflect `web-dev/template/CLAUDE.md` plus the phase
+> detail split into `web-dev/template/.claude/pipeline/*.md` (the canonical
+> orchestrator — this is what `init`/`sync` actually install). If you change a
+> phase or lane there, update this file in the same commit.
 
 ---
 
@@ -53,7 +54,9 @@ regardless of how small the change looks.
 flowchart TD
     T[Phase 0 Triage] --> RF{HIGH risk OR<br/>any risk_flag?}
     RF -->|yes| FF[feature-full<br/>full pipeline · all gates · security-auditor Opus/max]
-    RF -->|no| K2{Trivial code:<br/>typo / rename / config bump?<br/>no logic change}
+    RF -->|no| K1{Zero executable code touched?<br/>pure prose / doc-comment}
+    K1 -->|yes| DOC[docs lane]
+    K1 -->|no| K2{Trivial code:<br/>typo / rename / config bump?<br/>no logic change}
     K2 -->|yes| EXP[express lane]
     K2 -->|no| K3{Is it a bug?}
     K3 -->|"yes · known cause"| BK[bugfix-known]
@@ -73,16 +76,19 @@ strip a security gate.
 | Lane | 0.5 | 0.7 | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5–7 | Human Gates | Model |
 |---|---|---|---|---|---|---|---|---|---|
 | **express** | – | – | – | – | direct edit | – | – (lint+test only) | **1 merged** | Haiku |
+| **docs** | – | – | – | – | direct edit | – | – (lint only) | **1 merged** | Haiku |
 | **bugfix-known** | – | – | 1-para plan, no Red Team | 1 task | scoped | risk-gated | regression test | 1 / 2 / 3 | Haiku/Sonnet |
 | **bugfix-unknown** | – | ✅ Diagnosis | targets root cause, 1–2 sprints | ✅ | scoped | **full** | regression test | 1 / 2 / 3 | Sonnet→ |
 | **feature-fast** | opt | – | **1** Red Team sprint | ✅ | ✅ | risk-gated | ✅ | 1 / 2 / 3 | per table |
 | **feature-full** | opt | – | `sprint_count` sprints | ✅ | ✅ | **full** | ✅ | 1 / 2 / 3 | per table |
 
-Gate-collapse: **only** the `express` lane merges the three Human Gates into
-one lightweight, Translator-passed confirmation — permitted ONLY when
-risk_level is LOW and no risk_flag is set. Every other lane keeps all three
-gates. The gate is *merged, never skipped* — the human still explicitly
-approves once.
+`docs` is for PURELY documentation/prose/doc-comment edits with zero
+executable-code change — it mirrors `express` exactly, just without the test
+run. Gate-collapse: **only** the `express` and `docs` lanes merge the three
+Human Gates into one lightweight, Translator-passed confirmation — permitted
+ONLY when risk_level is LOW and no risk_flag is set (and, for `docs`, zero
+executable code is touched). Every other lane keeps all three gates. The gate
+is *merged, never skipped* — the human still explicitly approves once.
 
 ---
 

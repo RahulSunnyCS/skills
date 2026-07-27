@@ -1,12 +1,13 @@
 {
   "name": "claude-web-dev-skills",
   "version": "1.0.0",
-  "description": "Reusable Claude Code autonomous pipeline — 12 agents, 11 slash commands, and CLAUDE.md for any web project",
+  "description": "Reusable Claude Code autonomous pipeline — 15 specialist agents, 12 slash commands, and CLAUDE.md for any web project",
   "license": "MIT",
   "engines": { "node": ">=18" },
   "bin": { "claude-pipeline": "./bin/claude-pipeline.js" },
   "scripts": {
     "lint": "node --check bin/claude-pipeline.js && node --check lib/sync.js",
+    "test": "node --test",
     "setup": "node bin/claude-pipeline.js setup",
     "skill:import": "node bin/claude-pipeline.js publish"
   },

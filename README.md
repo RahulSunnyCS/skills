@@ -44,19 +44,26 @@ your-project/
     │   ├── senior-software-engineer.md
     │   ├── test-writer.md
     │   └── translator.md
-    └── commands/               ← 12 slash commands
-        ├── diagnose.md
-        ├── epic-doc.md
-        ├── fix.md
-        ├── grill-me.md
-        ├── implement.md
-        ├── plan.md
-        ├── qa-plan.md
-        ├── review.md
-        ├── setup-project.md
-        ├── start.md
-        ├── test.md
-        └── triage.md
+    ├── commands/               ← 12 slash commands
+    │   ├── diagnose.md
+    │   ├── epic-doc.md
+    │   ├── fix.md
+    │   ├── grill-me.md
+    │   ├── implement.md
+    │   ├── plan.md
+    │   ├── qa-plan.md
+    │   ├── review.md
+    │   ├── setup-project.md
+    │   ├── start.md
+    │   ├── test.md
+    │   └── triage.md
+    └── pipeline/               ← phase specs, read on demand by the
+        │                          orchestrator only (not injected into
+        │                          every sub-agent — keeps delegations cheap)
+        ├── phases.md
+        ├── lanes-and-specialists.md
+        ├── models-and-effort.md
+        └── output-formats.md
 ```
 
 > If a `CLAUDE.md` already exists, you will be prompted before it is
@@ -258,9 +265,9 @@ to share that variant as a named skill, run this from the root of the
 node web-dev/bin/claude-pipeline.js publish https://github.com/you/your-repo ecommerce
 ```
 
-This clones your repo, copies `.claude/agents/`, `.claude/commands/`, and
-`CLAUDE.md` into `web-dev/skills/ecommerce/`, then prints the commit
-instructions. Your project-specific `.claude/project/` and `settings.json`
+This clones your repo, copies `.claude/agents/`, `.claude/commands/`,
+`.claude/pipeline/` (if present), and `CLAUDE.md` into
+`web-dev/skills/ecommerce/`, then prints the commit instructions. Your project-specific `.claude/project/` and `settings.json`
 are never copied — only the pipeline files.
 
 ```bash
@@ -276,8 +283,8 @@ affect the default template.
 
 ## Keeping the pipeline up to date
 
-Pull in the latest agents, commands, and `CLAUDE.md` from the upstream
-template:
+Pull in the latest agents, commands, pipeline reference files, and
+`CLAUDE.md` from the upstream template:
 
 ```bash
 npx github:rahulsunnycs/skills sync
@@ -313,6 +320,7 @@ step — it makes no changes.
 | `CLAUDE.md` | Written (prompt if exists) | Overwritten if unmodified; diff + confirm if you've edited it |
 | `.claude/agents/*.md` | Always written | Always overwritten — do not modify locally |
 | `.claude/commands/*.md` | Always written | Always overwritten — do not modify locally |
+| `.claude/pipeline/*.md` | Always written | Always overwritten — do not modify locally |
 | `.claude/.pipeline-version` | Created | Updated |
 | `.claude/project/` | **Never touched** | **Never touched** |
 | `.claude/settings.json` | **Never touched** | **Never touched** |
