@@ -89,6 +89,7 @@ async function init(projectRoot) {
 
   fs.mkdirSync(path.join(projectRoot, '.claude', 'agents'), { recursive: true });
   fs.mkdirSync(path.join(projectRoot, '.claude', 'commands'), { recursive: true });
+  fs.mkdirSync(path.join(projectRoot, '.claude', 'pipeline'), { recursive: true });
 
   const agentCount = copyDir(
     path.join(TEMPLATE_DIR, '.claude', 'agents'),
@@ -97,6 +98,10 @@ async function init(projectRoot) {
   const commandCount = copyDir(
     path.join(TEMPLATE_DIR, '.claude', 'commands'),
     path.join(projectRoot, '.claude', 'commands'),
+  );
+  const pipelineCount = copyDir(
+    path.join(TEMPLATE_DIR, '.claude', 'pipeline'),
+    path.join(projectRoot, '.claude', 'pipeline'),
   );
 
   const templateContent = fs.readFileSync(path.join(TEMPLATE_DIR, 'CLAUDE.md'), 'utf8');
@@ -110,7 +115,7 @@ async function init(projectRoot) {
       if (!ok) {
         console.log('  Skipped CLAUDE.md — merge manually.');
         writeVersionMarker(projectRoot, sha256ofStr(templateContent));
-        printSummary(agentCount, commandCount, 'skipped');
+        printSummary(agentCount, commandCount, pipelineCount, 'skipped');
         return;
       }
     }
@@ -118,7 +123,7 @@ async function init(projectRoot) {
 
   fs.writeFileSync(destClaudeMd, templateContent);
   writeVersionMarker(projectRoot, sha256ofStr(templateContent));
-  printSummary(agentCount, commandCount, 'written');
+  printSummary(agentCount, commandCount, pipelineCount, 'written');
 }
 
 async function sync(projectRoot, checkOnly) {
@@ -130,7 +135,7 @@ async function sync(projectRoot, checkOnly) {
 
   const changed = [];
 
-  for (const area of ['agents', 'commands']) {
+  for (const area of ['agents', 'commands', 'pipeline']) {
     const srcDir = path.join(TEMPLATE_DIR, '.claude', area);
     const destDir = path.join(projectRoot, '.claude', area);
     fs.mkdirSync(destDir, { recursive: true });
@@ -191,9 +196,9 @@ async function sync(projectRoot, checkOnly) {
   }
 }
 
-function printSummary(agents, commands, claudeStatus) {
+function printSummary(agents, commands, pipelineFiles, claudeStatus) {
   console.log(
-    `\n✓ ${agents} agents, ${commands} commands written. CLAUDE.md: ${claudeStatus}.\n`,
+    `\n✓ ${agents} agents, ${commands} commands, ${pipelineFiles} pipeline reference files written. CLAUDE.md: ${claudeStatus}.\n`,
   );
   console.log('Next steps:');
   console.log('  1. git add CLAUDE.md .claude/ && git commit -m "feat: add claude-web-dev-skills pipeline"');
@@ -226,10 +231,12 @@ async function publish(sourceUrl, skillName) {
 
     const srcAgents   = path.join(tmpDir, '.claude', 'agents');
     const srcCommands = path.join(tmpDir, '.claude', 'commands');
+    const srcPipeline = path.join(tmpDir, '.claude', 'pipeline');
     const srcClaude   = path.join(tmpDir, 'CLAUDE.md');
 
     const hasAgents   = fs.existsSync(srcAgents);
     const hasCommands = fs.existsSync(srcCommands);
+    const hasPipeline = fs.existsSync(srcPipeline);
     const hasClaude   = fs.existsSync(srcClaude);
 
     if (!hasAgents && !hasCommands && !hasClaude) {
@@ -238,14 +245,16 @@ async function publish(sourceUrl, skillName) {
 
     fs.mkdirSync(path.join(skillDir, '.claude', 'agents'),   { recursive: true });
     fs.mkdirSync(path.join(skillDir, '.claude', 'commands'), { recursive: true });
+    if (hasPipeline) fs.mkdirSync(path.join(skillDir, '.claude', 'pipeline'), { recursive: true });
 
-    const agentCount   = hasAgents   ? copyDir(srcAgents,   path.join(skillDir, '.claude', 'agents'))   : 0;
-    const commandCount = hasCommands ? copyDir(srcCommands, path.join(skillDir, '.claude', 'commands')) : 0;
+    const agentCount    = hasAgents   ? copyDir(srcAgents,   path.join(skillDir, '.claude', 'agents'))   : 0;
+    const commandCount  = hasCommands ? copyDir(srcCommands, path.join(skillDir, '.claude', 'commands')) : 0;
+    const pipelineCount = hasPipeline ? copyDir(srcPipeline, path.join(skillDir, '.claude', 'pipeline')) : 0;
 
     if (hasClaude) fs.copyFileSync(srcClaude, path.join(skillDir, 'CLAUDE.md'));
 
     console.log(`\n✓ Skill '${skillName}' written to web-dev/skills/${skillName}/`);
-    console.log(`  ${agentCount} agents, ${commandCount} commands${hasClaude ? ', CLAUDE.md' : ''}\n`);
+    console.log(`  ${agentCount} agents, ${commandCount} commands${hasPipeline ? `, ${pipelineCount} pipeline reference files` : ''}${hasClaude ? ', CLAUDE.md' : ''}\n`);
     console.log('Next steps:');
     console.log(`  git add web-dev/skills/${skillName}/`);
     console.log(`  git commit -m "feat: add skill ${skillName} from ${sourceUrl}"`);
