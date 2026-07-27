@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm run test
+      - name: Check pipeline drift (root dogfood copy vs template)
+        run: node web-dev/bin/claude-pipeline.js sync --check
